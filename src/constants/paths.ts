@@ -1,5 +1,6 @@
 const root = "/";
 
 const todo_page = root + "todo";
+const market_page = root + "market";
 
-export { root, todo_page };
+export { market_page, root, todo_page };
