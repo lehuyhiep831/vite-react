@@ -1,3 +1,11 @@
+/**
+ * AddForm component
+ *
+ * - Presents a form for adding a new vocabulary card.
+ * - Handles input state, validation, and calls addCard with the new card data.
+ * - Pure presentational; does not manage persistence or parent state.
+ * - All fields are required; alerts if any are missing.
+ */
 import { useState, useRef } from "react";
 import { Card } from "./FlashCard";
 
@@ -11,6 +19,7 @@ type Props = {
 function AddForm({ addCard, onCancel }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCard, setNewCard] = useState({
+    wordId: "",
     character: "",
     pinyin: "",
     meaning: "",
@@ -37,6 +46,7 @@ function AddForm({ addCard, onCancel }: Props) {
     ) {
       addCard(newCard);
       setNewCard({
+        wordId: "",
         character: "",
         pinyin: "",
         meaning: "",

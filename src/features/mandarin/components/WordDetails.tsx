@@ -1,3 +1,9 @@
+/**
+ * WordDetails component
+ *
+ * - Receives a Card object (word) as props and displays its details: pinyin, meaning, sentence, sentencePinyin, and sentenceMeaning.
+ * - Pure presentational; does not manage state or persistence.
+ */
 import { Card } from "./FlashCard";
 
 export { WordDetails };

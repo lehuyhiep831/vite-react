@@ -1,151 +1,224 @@
-import { useState } from "react";
-
-import { ToggleSwitch } from "../../../components";
-import cards from "../../../data/mandarin.json";
-import { Setting } from "../types";
+/**
+ * FlashCard component
+ *
+ * - Displays flashcards for a section of words.
+ * - Handles navigation, marking words as mastered, and progress display.
+ * - Receives all state and handlers as props from parent.
+ * - Pure presentational; does not manage persistence or parent state.
+ * - Includes search/filter, progress bar, and details panel.
+ */
+import { useMemo, useState } from "react";
 import { PlayButton } from "./PlayButton";
-import { Sidebar } from "./Sidebar";
 import { WordDetails } from "./WordDetails";
+import { NavBar } from "./NabBar";
+import { Sidebar } from "./Sidebar";
 
-export { FlashCard, type Card };
-
-type Card = {
+export type Card = {
+  wordId: string;
   character: string;
   pinyin: string;
   meaning: string;
   sentence: string;
   sentencePinyin: string;
   sentenceMeaning: string;
+  mastered?: boolean;
+  lastReviewed?: string;
+  reviewCount?: number;
+  nextReview?: string;
 };
 
-function FlashCard() {
-  const [showExample, setShowExample] = useState(false);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
-  const [settings, setSettings] = useState<Setting>({
-    showPinyin: false,
-    showMeaning: true,
-  });
+type FlashCardProps = {
+  sectionWords: Card[];
+  sectionProgress: { mastered: number; total: number };
+  onMarkMastered: (wordId: string) => void;
+  masteredWordIds: Set<string>;
+  onBackToSection: () => void;
+};
 
-  const playAudio = (text: string | undefined) => {
-    if (text) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "zh-CN";
-      utterance.volume = 1;
-      speechSynthesis.speak(utterance);
-    }
-  };
+export function FlashCard({
+  sectionWords,
+  sectionProgress,
+  onMarkMastered,
+  masteredWordIds,
+  onBackToSection,
+}: FlashCardProps) {
+  const { mastered, total } = sectionProgress;
+
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [showDetails, setShowDetails] = useState(false);
+  const [search, setSearch] = useState("");
+
+  // Filtered word list for sidebar
+  const filteredWords = useMemo(() => {
+    if (!search.trim()) return sectionWords;
+    return sectionWords.filter(
+      (w: Card) =>
+        w.character.includes(search.trim()) ||
+        w.pinyin.toLowerCase().includes(search.trim().toLowerCase()),
+    );
+  }, [search, sectionWords]);
+
+  // If currentCardIndex is out of bounds after filtering, reset to 0
+  if (currentCardIndex >= filteredWords.length && filteredWords.length > 0) {
+    setCurrentCardIndex(0);
+    return null;
+  }
+
+  const currentCard = filteredWords[currentCardIndex];
 
   const handlePrevious = () => {
-    setCurrentCardIndex((currentCardIndex - 1 + cards.length) % cards.length);
-    //setShowMeaning(false);
+    setCurrentCardIndex(
+      (prev) => (prev - 1 + filteredWords.length) % filteredWords.length,
+    );
+    setShowDetails(false);
   };
-
   const handleNext = () => {
-    setCurrentCardIndex((currentCardIndex + 1) % cards.length);
-    //setShowMeaning(false);
+    setCurrentCardIndex((prev) => (prev + 1) % filteredWords.length);
+    setShowDetails(false);
+  };
+  const handleSidebarClick = (idx: number) => {
+    setCurrentCardIndex(idx);
+    setShowDetails(false);
   };
 
-  const currentCard = cards[currentCardIndex];
+  // Section complete?
+  const sectionComplete = sectionProgress.mastered === sectionProgress.total;
 
   return (
-    <div
-      id="flashcard"
-      className="flex flex-col"
-      style={{ width: "100%", minHeight: "100%" }}
-    >
+    <div>
       <div
-        className="flex gap-10"
-        style={{ maxHeight: "100%", justifyContent: "flex-end" }}
+        id="flashcard"
+        className="flex"
+        style={{ width: "100%", minHeight: "100%" }}
       >
-        <ToggleSwitch
-          label="Show Pinyin"
-          checked={settings.showPinyin}
-          onChange={(checked) =>
-            setSettings((s) => ({ ...s, showPinyin: checked }))
-          }
-        />
+        {/* Sidebar - 30% */}
 
-        <ToggleSwitch
-          label="Show Meaning"
-          checked={settings.showMeaning}
-          onChange={(checked) =>
-            setSettings((s) => ({ ...s, showMeaning: checked }))
-          }
+        <Sidebar
+          currentCardIndex={currentCardIndex}
+          mastered={mastered}
+          total={total}
+          filteredWords={filteredWords}
+          masteredWordIds={masteredWordIds}
+          search={search}
+          setSearch={setSearch}
+          handleSidebarClick={handleSidebarClick}
+          onBackToSection={onBackToSection}
         />
-      </div>
-      <div className="flex" style={{ maxHeight: "100%" }}>
-        <div style={{ width: "30%", overflowY: "auto", overflowX: "hidden" }}>
-          <Sidebar
-            showPinyin={settings.showPinyin}
-            showMeaning={settings.showMeaning}
-            cards={cards}
-            setCurrentCardIndex={setCurrentCardIndex}
-            currentCardIndex={currentCardIndex}
-          />
-        </div>
-        <div style={{ width: "40%" }}>
-          {/*Flashcard Content */}
-
+        {/* Flashcard Area - 40% */}
+        <div
+          className="flashcard-center flex flex-col  "
+          style={{ width: "40%" }}
+        >
           <div
-            className="flex flex-col"
-            style={{ height: "100%", justifyContent: "center" }}
+            className="flashcard-card flex flex-col padding-10"
+            style={{
+              height: "100%",
+              justifyContent: "space-around",
+              alignItems: "center",
+            }}
           >
-            <div
-              className="flex flex-col flex-center"
-              style={{ height: "100%" }}
-            >
-              <div
-                style={{ color: "rgba(255, 255, 255, 1)", fontSize: "100px" }}
-              >
-                {currentCard.character}
-              </div>
-              {settings.showPinyin && (
+            {currentCard ? (
+              <>
                 <div
-                  style={{ fontSize: "24px", color: "rgba(255, 255, 255, .8)" }}
+                  style={{
+                    fontSize: 100,
+                    color: "#ffffff",
+                    letterSpacing: 2,
+                  }}
                 >
-                  {currentCard.pinyin}
+                  {currentCard.character}
                 </div>
-              )}
-
-              {settings.showMeaning && (
+                {/* Speak and Show Details Row */}
                 <div
-                  style={{ fontSize: "24px", color: "rgba(255, 255, 255, .6)" }}
+                  className="flex"
+                  style={{
+                    width: "100%",
+                    alignItems: "center",
+                    justifyContent: "space-evenly",
+                  }}
                 >
-                  {currentCard.meaning}
+                  <PlayButton mandarinText={currentCard.character} />
+                  <button
+                    onClick={() => setShowDetails((v) => !v)}
+                    style={{
+                      boxShadow: showDetails ? "0 0 0 2px #007bff" : undefined,
+                      transition: "background 0.2s, box-shadow 0.2s",
+                    }}
+                  >
+                    {showDetails ? "Hide Details" : "Show Details"}
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="flex gap-10 padding-10" style={rowStyle}>
-              <button onClick={handlePrevious}>Previous</button>
+                {/* Mastered Button Row */}
+                <div className="flex flex-center" style={{ width: "100%" }}>
+                  <button
+                    onClick={() => onMarkMastered(currentCard.wordId)}
+                    disabled={masteredWordIds.has(currentCard.wordId)}
+                    style={{
+                      background: masteredWordIds.has(currentCard.wordId)
+                        ? "#aaaaaa"
+                        : "#38405aff",
+                      color: "#ffffff",
+                      minWidth: 140,
+                      transition: "background 0.2s, box-shadow 0.2s",
+                    }}
+                  >
+                    {masteredWordIds.has(currentCard.wordId)
+                      ? "Mastered"
+                      : "Mark as Mastered"}
+                  </button>
+                </div>
+                {/* Navigation Buttons at bottom corners */}
+                <div
+                  className=" flex "
+                  style={{ width: "100%", justifyContent: "space-around" }}
+                >
+                  <button type="button" onClick={handlePrevious}>
+                    ◀ Previous
+                  </button>
 
-              <PlayButton mandarinText={currentCard.character} />
-
-              <button onClick={handleNext}>Next</button>
-            </div>
-            <div className="flex gap-10 padding-10" style={rowStyle}>
-              <button onClick={() => playAudio(currentCard.sentence)}>
-                {`Play Sentence`}
-              </button>
-
-              <button onClick={() => setShowExample(!showExample)}>
-                {`${showExample ? "Hide" : "Show"} Example`}
-              </button>
-            </div>
-
-            {showExample && <WordDetails {...currentCard} />}
+                  <button type="button" onClick={handleNext}>
+                    Next ▶
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ color: "#fff" }}>No words found.</div>
+            )}
           </div>
         </div>
 
-        <div style={{ width: "30%" }}>
-          {/* {showAddForm && (
-            <AddForm addCard={addCard} onCancel={() => setShowAddForm(false)} />
-          )} */}
+        {/* Details/Meaning Panel - 30% */}
+        <div
+          className="flashcard-details flex flex-col"
+          style={{
+            width: "30%",
+            background: showDetails && currentCard ? "#2a3145" : "transparent",
+            borderRadius: showDetails && currentCard ? 16 : 0,
+
+            padding: "36px",
+            color: "#ffffff",
+            fontSize: 17,
+            minHeight: "100%",
+          }}
+        >
+          {showDetails && currentCard ? (
+            <>
+              <WordDetails {...currentCard} />
+              {/* Speak Example Sentence Button, styled and separated */}
+              <div
+                style={{
+                  width: "100%",
+                  marginTop: 28,
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <PlayButton mandarinText={currentCard.sentence} />
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
-
-const rowStyle: React.CSSProperties = {
-  justifyContent: "space-between",
-};
